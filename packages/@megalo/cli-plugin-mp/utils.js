@@ -1,6 +1,7 @@
 const fs = require('fs')
 const path = require('path')
 const contextDir = path.resolve(process.env.MEGALO_CLI_CONTEXT, '.')
+const watchr = require('watchr')
 
 exports.toPlugin = id => ({ id, apply: require(id) })
 
@@ -42,4 +43,23 @@ exports.findExisting = (context, files) => {
 exports.checkFileExistsSync = fileOrDirPath => {
   fileOrDirPath = fileOrDirPath.includes(contextDir) ? fileOrDirPath : path.join(contextDir, fileOrDirPath)
   return fs.existsSync(fileOrDirPath) ? fileOrDirPath : false
+}
+
+/**
+ * 文件监听函数
+ * @param {(String|String[])} files
+ * @param {Function} callback
+ */
+exports.watchFile = function (files, callback) {
+  [].concat(files).forEach((file) => {
+    watchr.open(file, (changeType) => {
+      if (changeType === 'update') {
+        callback(file)
+      }
+    }, (err) => {
+      if (err && err.code !== 'ENOENT') {
+        throw err
+      }
+    })
+  })
 }

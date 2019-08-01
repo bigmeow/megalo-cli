@@ -2,7 +2,7 @@ const fs = require('fs')
 const chalk = require('chalk')
 const path = require('path')
 const { warn, getCssExt } = require('@megalo/cli-share-utils')
-const { findExisting, checkFileExistsSync } = require('./utils')
+const { findExisting, checkFileExistsSync, watchFile } = require('./utils')
 
 module.exports = (api, options) => {
   const platform = process.env.PLATFORM
@@ -258,7 +258,33 @@ module.exports = (api, options) => {
       return path.join(entryContextRelativePath, subpackage)
     })
 
-    return { appEntry: appEntryPath, pagesEntry: pagesEntry(appEntryPath, options), subPackagesRoot }
+    const pages = pagesEntry(appEntryPath)
+    if (!isProd) {
+      const oldPages = Object.keys(pages)
+      console.log('监听文件：', oldPages, process.argv)
+      watchFile(appEntryPath, () => {
+        let newPages = Object.keys(pagesEntry(appEntryPath))
+        console.log('新配置：', newPages)
+        newPages = newPages.filter(p => {
+          return !oldPages.includes(p)
+        })
+        console.log('监听到json修改', `node ${process.argv[1]} ` + process.argv.slice(2).join(' '))
+        if (newPages && newPages.length > 0) {
+          process.once('exit', (code) => {
+            console.log(`About to exit with code: ${code}`)
+            console.log(process.argv)
+            // 执行命令重启服务
+            const shell = require('shelljs')
+            shell.exec(`node ${process.argv[1]} ` + process.argv.slice(2).join(' '), (err) => {
+              console.log(err)
+            })
+          })
+          process.exit(1)
+        }
+      })
+    }
+
+    return { appEntry: appEntryPath, pagesEntry: pages, subPackagesRoot }
   }
 
   function createTarget () {
